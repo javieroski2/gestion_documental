@@ -40,6 +40,9 @@ class AuthController extends Controller {
                     $this->view('auth/login', ['error' => $error]);
                     return;
                 }
+
+                // Mitigar fijación de sesión después de autenticación exitosa
+                session_regenerate_id(true);
                 
                 // Iniciar sesión
                 $_SESSION['user_id'] = $user['id'];
@@ -75,6 +78,7 @@ class AuthController extends Controller {
             $auditoriaModel->registrar('Cerró sesión', 'usuarios', $userId);
         }
         
+        $_SESSION = [];
         session_destroy();
         $this->redirect('auth/login');
     }
