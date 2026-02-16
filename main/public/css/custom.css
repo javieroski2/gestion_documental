@@ -1,0 +1,53 @@
+/* 
+ * CSS Personalizado
+ * Sistema de Gestión Documental
+ */
+
+/* Mejoras del sidebar */
+.brand-link {
+    border-bottom: 1px solid #4b545c;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .small-box h3 {
+        font-size: 1.5rem;
+    }
+}
+
+/* Mejoras de alertas */
+.alert {
+    border-radius: 0.25rem;
+}
+
+/* Loading spinner */
+.loading {
+    display: none;
+    text-align: center;
+    padding: 20px;
+}
+
+.loading.active {
+    display: block;
+}
+
+/* Estilos personalizados para info-box */
+.info-box {
+    min-height: 90px;
+}
+
+.info-box .info-box-icon {
+    width: 90px;
+}
+
+/* Cards con sombra mejorada */
+.card {
+    box-shadow: 0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.2);
+}
+
+/* Botones de aplicación mejorados */
+.btn-app {
+    border-radius: 3px;
+    width: 100%;
+    margin-bottom: 10px;
+}

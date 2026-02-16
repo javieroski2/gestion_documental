@@ -1,0 +1,15 @@
+<?php
+/**
+ * Configuración de Base de Datos - EJEMPLO
+ * 
+ * INSTRUCCIONES:
+ * 1. Copia este archivo y renómbralo a "database.php"
+ * 2. Edita los valores con tu configuración real
+ * 3. NUNCA subas database.php a GitHub (está en .gitignore)
+ */
+
+// Configuración de la base de datos
+define('DB_HOST', 'localhost');           // Host de la BD
+define('DB_NAME', 'gestion_documental');  // Nombre de la BD
+define('DB_USER', 'root');                // Usuario de la BD
+define('DB_PASS', '');                    // Contraseña de la BD (vacía en XAMPP por defecto)
