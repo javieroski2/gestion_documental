@@ -15,7 +15,16 @@ class AuthController extends Controller {
     public function login() {
         // Si ya está autenticado, redirigir al dashboard
         if (isset($_SESSION['user_id'])) {
+            if ($this->isSessionExpired()) {
+                $this->forceLogoutByInactivity();
+            }
+
+            $_SESSION['last_activity'] = time();
             $this->redirect('dashboard');
+        }
+
+        if (isset($_GET['timeout']) && $_GET['timeout'] == '1') {
+            $error = 'La sesión expiró por inactividad. Inicie sesión nuevamente.';
         }
         
         // Procesar formulario
@@ -50,6 +59,7 @@ class AuthController extends Controller {
                 $_SESSION['email'] = $user['email'];
                 $_SESSION['rol_id'] = $user['rol_id'];
                 $_SESSION['rol_nombre'] = $this->userModel->getRolNombre($user['rol_id']);
+                $_SESSION['last_activity'] = time();
                 
                 // Registrar auditoría
                 $auditoriaModel = $this->model('Auditoria');

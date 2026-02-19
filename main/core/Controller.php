@@ -5,6 +5,11 @@
  */
 
 class Controller {
+
+    /**
+     * Tiempo máximo de inactividad permitido (en segundos).
+     */
+    private const SESSION_TIMEOUT_SECONDS = 180;
     
     /**
      * Cargar modelo
@@ -42,6 +47,32 @@ class Controller {
         if (!isset($_SESSION['user_id'])) {
             $this->redirect('auth/login');
         }
+
+        if ($this->isSessionExpired()) {
+            $this->forceLogoutByInactivity();
+        }
+
+        $_SESSION['last_activity'] = time();
+    }
+
+    /**
+     * Verifica si la sesión expiró por inactividad.
+     */
+    protected function isSessionExpired() {
+        if (!isset($_SESSION['last_activity'])) {
+            return false;
+        }
+
+        return (time() - $_SESSION['last_activity']) > self::SESSION_TIMEOUT_SECONDS;
+    }
+
+    /**
+     * Cierra sesión por inactividad y redirige al login.
+     */
+    protected function forceLogoutByInactivity() {
+        session_unset();
+        session_destroy();
+        $this->redirect('auth/login?timeout=1');
     }
     
     /**
