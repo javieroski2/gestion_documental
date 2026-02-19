@@ -47,6 +47,9 @@
                                     <?php if (isset($errors['titulo'])): ?>
                                     <div class="invalid-feedback"><?php echo $errors['titulo']; ?></div>
                                     <?php endif; ?>
+                                    <small class="form-text text-muted">
+                                        Si subes varios archivos, este título se usará como base (ejemplo: "Informe (1)", "Informe (2)").
+                                    </small>
                                 </div>
 
                                 <div class="form-group">
@@ -73,17 +76,19 @@
                                 </div>
 
                                 <div class="form-group">
-                                    <label for="archivo">Archivo <span class="text-danger">*</span></label>
+                                    <label for="archivo">Archivos <span class="text-danger">*</span></label>
                                     <div class="custom-file">
-                                        <input type="file" name="archivo" id="archivo" 
+                                        <input type="file" name="archivo[]" id="archivo" 
                                                class="custom-file-input <?php echo isset($errors['archivo']) ? 'is-invalid' : ''; ?>" 
+                                               multiple
                                                required>
-                                        <label class="custom-file-label" for="archivo">Seleccionar archivo...</label>
+                                        <label class="custom-file-label" for="archivo">Seleccionar archivo(s)...</label>
                                         <?php if (isset($errors['archivo'])): ?>
                                         <div class="invalid-feedback"><?php echo $errors['archivo']; ?></div>
                                         <?php endif; ?>
                                     </div>
                                     <small class="form-text text-muted">
+                                        <strong>Máximo por envío:</strong> 5 archivos<br>
                                         <strong>Tamaño máximo:</strong> <?php echo number_format(MAX_FILE_SIZE / 1048576, 2); ?> MB<br>
                                         <strong>Extensiones permitidas:</strong> 
                                         <?php foreach (ALLOWED_EXTENSIONS as $ext): ?>
@@ -116,10 +121,18 @@
 </div>
 
 <script>
-// Mostrar nombre del archivo seleccionado
+// Mostrar archivo(s) seleccionado(s)
 $('#archivo').on('change', function() {
-    var fileName = $(this).val().split('\\').pop();
-    $(this).next('.custom-file-label').html(fileName);
+    var totalArchivos = this.files.length;
+    var texto = 'Seleccionar archivo(s)...';
+
+    if (totalArchivos === 1) {
+        texto = this.files[0].name;
+    } else if (totalArchivos > 1) {
+        texto = totalArchivos + ' archivos seleccionados';
+    }
+
+    $(this).next('.custom-file-label').html(texto);
 });
 </script>
 
