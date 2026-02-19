@@ -5,6 +5,8 @@
  */
 
 class DocumentoController extends Controller {
+
+    private const MAX_ARCHIVOS_POR_SUBIDA = 5;
     
     private $documentoModel;
     private $categoriaModel;
@@ -50,42 +52,54 @@ class DocumentoController extends Controller {
             $errors = $this->validarSubida($_FILES, $_POST);
             
             if (empty($errors)) {
-                // Procesar archivo
-                $archivo = $_FILES['archivo'];
-                $extension = strtolower(pathinfo($archivo['name'], PATHINFO_EXTENSION));
-                $nombreArchivo = uniqid() . '_' . time() . '.' . $extension;
-                $rutaDestino = '../public/uploads/documentos/' . $nombreArchivo;
-                
-                if (move_uploaded_file($archivo['tmp_name'], $rutaDestino)) {
-                    // Guardar en BD
+                $archivos = $this->normalizarArchivosSubidos($_FILES['archivo']);
+                $auditoriaModel = $this->model('Auditoria');
+                $documentosGuardados = 0;
+
+                foreach ($archivos as $index => $archivo) {
+                    $extension = strtolower(pathinfo($archivo['name'], PATHINFO_EXTENSION));
+                    $nombreArchivo = uniqid() . '_' . time() . '_' . $index . '.' . $extension;
+                    $rutaDestino = '../public/uploads/documentos/' . $nombreArchivo;
+
+                    if (!move_uploaded_file($archivo['tmp_name'], $rutaDestino)) {
+                        $errors['archivo'] = 'Error al subir uno de los archivos seleccionados';
+                        break;
+                    }
+
                     $data = [
                         'categoria_id' => $_POST['categoria_id'],
                         'usuario_id' => $_SESSION['user_id'],
-                        'titulo' => trim($_POST['titulo']),
+                        'titulo' => $this->generarTituloDocumento(trim($_POST['titulo']), $archivo['name'], $index, count($archivos)),
                         'descripcion' => trim($_POST['descripcion'] ?? ''),
                         'archivo' => $nombreArchivo,
                         'extension' => $extension,
                         'tamano' => $archivo['size']
                     ];
-                    
-                    if ($this->documentoModel->crear($data)) {
-                        // Registrar en auditoría
-                        $auditoriaModel = $this->model('Auditoria');
-                        $auditoriaModel->registrar(
-                            'Subió documento: ' . $data['titulo'],
-                            'documentos',
-                            null,
-                            null,
-                            json_encode($data)
-                        );
-                        
-                        $this->setFlash('success', 'Documento subido exitosamente. Pendiente de validación.');
-                        $this->redirect('documento/mis-documentos');
-                    } else {
+
+                    if (!$this->documentoModel->crear($data)) {
+                        @unlink($rutaDestino);
                         $errors['general'] = 'Error al guardar en base de datos';
+                        break;
                     }
-                } else {
-                    $errors['archivo'] = 'Error al subir el archivo';
+
+                    $auditoriaModel->registrar(
+                        'Subió documento: ' . $data['titulo'],
+                        'documentos',
+                        null,
+                        null,
+                        json_encode($data)
+                    );
+
+                    $documentosGuardados++;
+                }
+
+                if (empty($errors) && $documentosGuardados > 0) {
+                    $mensaje = $documentosGuardados === 1
+                        ? 'Documento subido exitosamente. Pendiente de validación.'
+                        : 'Se subieron ' . $documentosGuardados . ' documentos exitosamente. Pendientes de validación.';
+
+                    $this->setFlash('success', $mensaje);
+                    $this->redirect('documento/mis-documentos');
                 }
             }
             
@@ -269,8 +283,10 @@ class DocumentoController extends Controller {
     private function validarSubida($files, $data) {
         $errors = [];
         
+        $archivos = $this->normalizarArchivosSubidos($files['archivo'] ?? []);
+
         // Validar título
-        if (empty($data['titulo'])) {
+        if (empty($data['titulo']) && count($archivos) === 1) {
             $errors['titulo'] = 'El título es requerido';
         }
         
@@ -280,29 +296,85 @@ class DocumentoController extends Controller {
         }
         
         // Validar archivo
-        if (empty($files['archivo']['name'])) {
+        if (empty($archivos)) {
             $errors['archivo'] = 'Debe seleccionar un archivo';
         } else {
-            $archivo = $files['archivo'];
-            
-            // Validar tamaño
-            if ($archivo['size'] > MAX_FILE_SIZE) {
-                $errors['archivo'] = 'El archivo excede el tamaño máximo permitido (' . (MAX_FILE_SIZE / 1048576) . ' MB)';
+            if (count($archivos) > self::MAX_ARCHIVOS_POR_SUBIDA) {
+                $errors['archivo'] = 'Solo puede subir hasta ' . self::MAX_ARCHIVOS_POR_SUBIDA . ' archivos por envío';
             }
-            
-            // Validar extensión
-            $extension = strtolower(pathinfo($archivo['name'], PATHINFO_EXTENSION));
-            if (!in_array($extension, ALLOWED_EXTENSIONS)) {
-                $errors['archivo'] = 'Extensión no permitida. Extensiones válidas: ' . implode(', ', ALLOWED_EXTENSIONS);
-            }
-            
-            // Validar errores de subida
-            if ($archivo['error'] !== UPLOAD_ERR_OK) {
-                $errors['archivo'] = 'Error al subir el archivo';
+
+            foreach ($archivos as $archivo) {
+                // Validar tamaño
+                if ($archivo['size'] > MAX_FILE_SIZE) {
+                    $errors['archivo'] = 'Uno de los archivos excede el tamaño máximo permitido (' . (MAX_FILE_SIZE / 1048576) . ' MB)';
+                    break;
+                }
+
+                // Validar extensión
+                $extension = strtolower(pathinfo($archivo['name'], PATHINFO_EXTENSION));
+                if (!in_array($extension, ALLOWED_EXTENSIONS)) {
+                    $errors['archivo'] = 'Extensión no permitida. Extensiones válidas: ' . implode(', ', ALLOWED_EXTENSIONS);
+                    break;
+                }
+
+                // Validar errores de subida
+                if ($archivo['error'] !== UPLOAD_ERR_OK) {
+                    $errors['archivo'] = 'Error al subir uno de los archivos';
+                    break;
+                }
             }
         }
         
         return $errors;
+    }
+
+    /**
+     * Normalizar el arreglo de archivos para soportar carga múltiple
+     */
+    private function normalizarArchivosSubidos($archivoInput) {
+        $archivos = [];
+
+        if (empty($archivoInput) || empty($archivoInput['name'])) {
+            return $archivos;
+        }
+
+        if (is_array($archivoInput['name'])) {
+            foreach ($archivoInput['name'] as $index => $name) {
+                if (empty($name)) {
+                    continue;
+                }
+
+                $archivos[] = [
+                    'name' => $name,
+                    'type' => $archivoInput['type'][$index] ?? '',
+                    'tmp_name' => $archivoInput['tmp_name'][$index] ?? '',
+                    'error' => $archivoInput['error'][$index] ?? UPLOAD_ERR_NO_FILE,
+                    'size' => $archivoInput['size'][$index] ?? 0
+                ];
+            }
+
+            return $archivos;
+        }
+
+        $archivos[] = $archivoInput;
+        return $archivos;
+    }
+
+    /**
+     * Generar título para el documento según el orden de carga
+     */
+    private function generarTituloDocumento($tituloBase, $nombreOriginal, $index, $totalArchivos) {
+        if ($totalArchivos === 1) {
+            return !empty($tituloBase)
+                ? $tituloBase
+                : pathinfo($nombreOriginal, PATHINFO_FILENAME);
+        }
+
+        if (!empty($tituloBase)) {
+            return $tituloBase . ' (' . ($index + 1) . ')';
+        }
+
+        return pathinfo($nombreOriginal, PATHINFO_FILENAME);
     }
     
     /**
